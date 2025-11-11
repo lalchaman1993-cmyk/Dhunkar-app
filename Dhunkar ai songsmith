@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>धुनकार (Dhunkar): AI Songsmith</title>
+    <!-- Favicon - लोगो को ब्राउज़र टैब में दिखाने के लिए --><link rel="icon" href="URL_TO_YOUR_LOGO_FAVICON.png" type="image/png">
+    <!-- Load Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons for aesthetic --><script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom styles for dark theme and interactivity */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a2e; /* Dark background */
+            color: #e0e0e0;
+        }
+        .container {
+            min-height: 100vh;
+        }
+        .card {
+            background-color: #2c2a4a;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease;
+        }
+        .input-field {
+            background-color: #1a1a2e;
+            border: 1px solid #4a4a70;
+            color: #e0e0e0;
+            resize: none;
+        }
+        .btn-primary {
+            background-color: #ff5757; /* Accent color */
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #e54242;
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        /* Style for the generated lyrics block */
+        .lyrics-box {
+            white-space: pre-wrap; /* Preserves formatting from LLM output */
+            line-height: 1.6;
+        }
+        .disclaimer {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            border-left: 3px solid #ff5757;
+            padding-left: 0.75rem;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div id="app" class="container mx-auto max-w-lg flex flex-col items-center py-8">
+        <!-- Header --><header class="text-center mb-8">
+            <!-- लोगो इमेज यहाँ जोड़ें - आपको "URL_TO_YOUR_LOGO.png" को बदलना होगा --><img src="URL_TO_YOUR_LOGO.png" alt="धुनकार AI Songsmith Logo" class="mx-auto mb-4 w-32 h-32 object-contain">
+            <h1 class="4xl font-extrabold text-[#ff5757]">धुनकार (Dhunkar): AI Songsmith</h1>
+            <p class="text-xl text-gray-400 mt-2">Generate your next hit song instantly.</p>
+        </header>
+
+        <!-- Input Card --><div class="card w-full p-6 rounded-xl mb-8">
+            <h2 class="text-2xl font-bold mb-4 flex items-center">
+                <i data-lucide="music" class="w-6 h-6 mr-3 text-[#ff5757]"></i>
+                Song Concept
+            </h2>
+
+            <!-- Voice Selection Dropdown --><div class="mb-4">
+                <label for="voice-select" class="block text-sm font-medium text-gray-400 mb-2">Speaking Voice (Tone)</label>
+                <select id="voice-select" class="input-field w-full p-2 rounded-lg focus:ring-2 focus:ring-[#ff5757] outline-none">
+                    <!-- Options populated by JS --></select>
+            </div>
+            
+            <!-- New Language Selection Dropdown --><div class="mb-4">
+                <label for="language-select" class="block text-sm font-medium text-gray-400 mb-2">Song Language (गाने की भाषा)</label>
+                <select id="language-select" class="input-field w-full p-2 rounded-lg focus:ring-2 focus:ring-[#ff5757] outline-none">
+                    <!-- Options populated by JS --></select>
+            </div>
+
+            <!-- New: Character/Persona Input (Now a Select) --><div class="mb-4">
+                <label for="character-select" class="block text-sm font-medium text-gray-400 mb-2">Character/Persona (गाना कौन गा रहा है?)</label>
+                <select id="character-select" class="input-field w-full p-2 rounded-lg focus:ring-2 focus:ring-[#ff5757] outline-none">
+                    <!-- Options populated by JS --></select>
+            </div>
+
+            <p class="text-sm text-gray-400 mb-3">Describe the song you want: mood, theme, genre, or message.</p>
+            <textarea
+                id="song-prompt"
+                class="input-field w-full h-32 p-3 rounded-lg focus:ring-2 focus:ring-[#ff5757] outline-none"
+                placeholder="Example: A high-energy 80s synthwave pop song about a robot learning to feel love."
+            ></textarea>
+
+            <button
+                id="generate-button"
+                class="btn-primary w-full mt-4 py-3 rounded-xl text-lg font-semibold flex items-center justify-center"
+                onclick="generateSong()"
+            >
+                <i data-lucide="sparkles" class="w-5 h-5 mr-2"></i>
+                Generate Song
+            </button>
+
+            <!-- Loading Indicator --><div id="loading-indicator" class="hidden mt-4 text-center text-[#ff5757]">
+                <div class="flex items-center justify-center space-x-2">
+                    <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Composing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Card --><div id="output-card" class="card w-full p-6 rounded-xl hidden">
+            <h2 class="text-2xl font-bold mb-4 flex items-center text-[#ff5757]">
+                <i data-lucide="scroll-text" class="w-6 h-6 mr-3"></i>
+                Generated Masterpiece
+            </h2>
+            <div id="song-output-content">
+                <!-- Content injected here --></div>
+
+            <!-- New: Copyright Disclaimer --><div class="disclaimer mt-8">
+                <p class="font-bold mb-1">कॉपीराइट और उपयोग (Copyright & Usage Disclaimer):</p>
+                <p>यह सामग्री AI (आर्टिफिशियल इंटेलिजेंस) द्वारा रचनात्मक प्रेरणा (Creative Inspiration) के लिए उत्पन्न की गई है।</p>
+                <p>इस टेक्स्ट (Lyrics/Structure) का सार्वजनिक या व्यावसायिक उपयोग करने से पहले, यह सुनिश्चित करना आपकी ज़िम्मेदारी है कि यह किसी भी मौजूदा कॉपीराइट का उल्लंघन नहीं करता है। धुनकार (Dhunkar) किसी भी कानूनी विवाद के लिए जिम्मेदार नहीं होगा।</p>
+            </div>
+        </div>
+
+        <!-- Error Message --><div id="error-message" class="hidden mt-4 p-4 bg-red-800 rounded-lg w-full max-w-lg text-sm">
+            <p class="font-bold">Error:</p>
+            <p id="error-text"></p>
+        </div>
+
+    </div>
+
+    <script>
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
+        const TTS_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=";
+        const apiKey = ""; // API key is handled by the environment if empty
+        
+        const songPromptEl = document.getElementById('song-prompt');
+        const characterSelectEl = document.getElementById('character-select'); // CHANGED: Now a select element
+        const generateButton = document.getElementById('generate-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const outputCard = document.getElementById('output-card');
+        const songOutputContent = document.getElementById('song-output-content');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        // Global variable to store the last generated audio URL (Blob URL)
+        let lastAudioUrl = null; 
+
+        // Define available voices for the dropdown (UPDATED with regional mapping)
+        const voices = [
+            { name: "Kore", label: "Kore (Standard/Emotional - सामान्य भावनात्मक)" },
+            { name: "Sadachbia", label: "Sadachbia (Lively & Energetic - पंजाबी पॉप टोन)" },
+            { name: "Achird", label: "Achird (Friendly & Casual - हरियाणवी टोन)" },
+            { name: "Callirrhoe", label: "Callirrhoe (Easy-going & Smooth - गुजराती टोन)" },
+            { name: "Leda", label: "Leda (Youthful & Expressive - पहाड़ी टोन)" },
+            { name: "Gacrux", label: "Gacrux (Mature & Deep - राजस्थानी टोन)" },
+            { name: "Zephyr", label: "Zephyr (Higher Pitch / Bright Tone)" },
+            { name: "Charon", label: "Charon (Lower Pitch / Deep Tone)" },
+            { name: "Puck", label: "Puck (Upbeat & Energetic)" }
+        ];
+
+        // Define available languages for the dropdown
+        const languages = [
+            { code: "hi", label: "Hindi (हिंदी)", isDefault: true },
+            { code: "pa", label: "Punjabi (ਪੰਜਾਬੀ)" },
+            { code: "ph", label: "Pahadi/Himachali (पहाड़ी/हिमाचली)" },
+            { code: "ha", label: "Haryanvi (हरियाणवी)" },
+            { code: "ra", label: "Rajasthani (राजस्थानी)" },
+            { code: "gu", label: "Gujarati (ગુજરાતી)" },
+            { code: "en", label: "English (अंग्रेज़ी)" },
+            { code: "es", label: "Spanish (स्पेनिश)" },
+            { code: "fr", label: "French (फ्रेंच)" },
+            { code: "ja", label: "Japanese (जापानी)" },
+            { code: "ko", label: "Korean (कोरियाई)" },
+            { code: "de", label: "German (जर्मन)" },
+            { code: "auto", label: "Auto-Detect (स्वयं चुनें)" }
+        ];
+
+        // Define available personas for the dropdown
+        const personas = [
+            { code: "", label: "None / Default Persona (कोई नहीं / डिफ़ॉल्ट)" },
+            { code: "young_dreamer", label: "Young Dreamer (जवान सपने देखने वाला)" },
+            { code: "heartbroken_lover", label: "Heartbroken Lover (टूटा हुआ प्रेमी)" },
+            { code: "wise_sage", label: "Wise Sage (बुद्धिमान साधु)" },
+            { code: "rebel_artist", label: "Rebel Artist (विद्रोही कलाकार)" },
+            { code: "futuristic_scientist", label: "Futuristic Scientist (भविष्यवादी वैज्ञानिक)" },
+        ];
+
+
+        // --- LLM Structured Response Schema ---
+        const responseSchema = {
+            type: "OBJECT",
+            properties: {
+                "title": { "type": "STRING", "description": "The title of the song." },
+                "genre": { "type": "STRING", "description": "The genre of the song, e.g., 'Acoustic Folk', 'Synthwave Pop'." },
+                "structure": { "type": "STRING", "description": "A brief, evocative description of the song's musical structure, instrumentation, tempo, and mood. Do not include structure labels like 'Verse 1: / Chorus: ' here." },
+                "lyrics": { "type": "STRING", "description": "The complete lyrics of the song, clearly structured with section labels (e.g., 'Verse 1:', 'Chorus:', 'Bridge:') and separated by double newlines." }
+            },
+            required: ["title", "genre", "structure", "lyrics"]
+        };
+
+        const systemPrompt = "You are 'MaestroAI', a world-class, multi-genre music composer and lyricist. Your task is to generate a complete song based on the user's prompt and the provided character/persona. You must ensure the tone, voice, and subject matter of the lyrics reflect the defined character. Generate a creative and coherent title, a specific genre, a description of the musical structure, and the full lyrics. The lyrics must be clearly formatted with section labels (e.g., 'Verse 1:', 'Chorus:', 'Bridge:') and separated by double newlines between sections. Do not include any descriptive text outside of the JSON structure.";
+
+        const MAX_RETRIES = 5;
+        
+        // Data generated from user's last prompt: "Dil mein rakh lunga nishani ki tarah"
+        let initialSongData = {
+            "title": "Yaadon Ka Safar (यादों का सफर)",
+            "genre": "Bollywood Acoustic Ballad",
+            "structure": "Starts with soft piano and acoustic guitar, building slowly with subtle percussion. The chorus introduces soaring violins and a driving, emotional beat. The bridge is expansive and hopeful, returning to a quiet, reflective outro. Tempo: Andante.",
+            "lyrics": "(Intro)\n\nHawa mein ghuli, woh aakhri khamoshi\nAankhon mein thehri, woh halki si nami\n\nVerse 1:\nJab haath chhuta, toh kya kehna tha\nLab pe lafz the, par dil seh gaya\nYe waqt ruk jaye, bas itni thi dua\nDil mein leke chala, teri woh sada\n\nChorus:\nDil mein rakh lunga nishani ki tarah\nTeri har baat, teri har adaa\nYe ishq amar hai, ye bandhan sada\nDil mein rakh lunga nishani ki tarah\n\nVerse 2:\nShaamein ab meri, tere bina sooni\nPar teri yaadein hain, meri roshni\nRukhsat ka lamha, jo ajeeb tha\nLaga ke tu mere, kitna kareeb tha\n\nChorus:\nDil mein rakh lunga nishani ki tarah\nTeri har baat, teri har adaa\nYe ishq amar hai, ye bandhan sada\nDil mein rakh lunga nishani ki tarah\n\nBridge:\nRaaste alag hain, manzil juda hai\nLekin is dil mein, tu hi khuda hai\nBhool na paunga, woh guzra hua pal\nTu kal bhi mera tha, tu aaj bhi mera kal\n\nChorus:\nDil mein rakh lunga nishani ki tarah\nTeri har baat, teri har adaa\nYe ishq amar hai, ye bandhan sada\nDil mein rakh lunga nishani ki tarah\n\n(Outro)\nNishani ki tarah...\nHamesha..."
+        };
+
+        // --- TTS Utility Functions ---
+
+        /** Converts Base64 string to ArrayBuffer. */
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /** Converts PCM data buffer to a WAV Blob (assuming 24000Hz, 16-bit, 1-channel). */
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1; 
+            const bytesPerSample = 2; // 16-bit PCM
+            const buffer = new ArrayBuffer(44 + pcmData.byteLength);
+            const view = new DataView(buffer);
+            
+            // Helper function to write a string to the data view
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            let offset = 0;
+
+            // RIFF chunk
+            writeString(view, offset, 'RIFF'); offset += 4;
+            view.setUint32(offset, 36 + pcmData.byteLength, true); offset += 4;
+            writeString(view, offset, 'WAVE'); offset += 4;
+
+            // FMT sub-chunk
+            writeString(view, offset, 'fmt '); offset += 4;
+            view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size (16 for PCM)
+            view.setUint16(offset, 1, true); offset += 2; // Audio format (1 for PCM)
+            view.setUint16(offset, numChannels, true); offset += 2;
+            view.setUint32(offset, sampleRate, true); offset += 4;
+            view.setUint32(offset, sampleRate * numChannels * bytesPerSample, true); offset += 4; // Byte rate
+            view.setUint16(offset, numChannels * bytesPerSample, true); offset += 2; // Block align
+            view.setUint16(offset, 8 * bytesPerSample, true); offset += 2; // Bits per sample (16)
+
+            // DATA sub-chunk
+            writeString(view, offset, 'data'); offset += 4;
+            view.setUint32(offset, pcmData.byteLength, true); offset += 4;
+
+            // Write PCM data
+            const pcmBytes = new Uint8Array(pcmData);
+            for (let i = 0; i < pcmData.byteLength; i++) {
+                view.setUint8(offset + i, pcmBytes[i]);
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+
+        /**
+         * Generic function to handle the API call with exponential backoff.
+         */
+        async function fetchWithBackoff(url, options, retries = 0) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response;
+            } catch (error) {
+                if (retries < MAX_RETRIES) {
+                    const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
+                    // console.warn(`Request failed. Retrying in ${delay / 1000}s... (Attempt ${retries + 1}/${MAX_RETRIES})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithBackoff(url, options, retries + 1);
+                } else {
+                    throw new Error("API call failed after multiple retries: " + error.message);
+                }
+            }
+        }
+
+        /**
+         * Handles the song generation process.
+         */
+        async function generateSong() {
+            const userPrompt = songPromptEl.value.trim();
+            const characterCode = characterSelectEl.value; // Get the code from the select element
+            
+            // Find the character label for the prompt, if a character is selected
+            const characterPersona = characterCode ? personas.find(p => p.code === characterCode) : null;
+            const characterLabel = characterPersona ? characterPersona.label : '';
+
+            const selectedLanguage = document.getElementById('language-select').value; // Get selected language
+
+            if (!userPrompt) {
+                displayError("Please enter a song concept to generate lyrics.");
+                return;
+            }
+
+            // UI state management
+            generateButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            outputCard.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            songOutputContent.innerHTML = '';
+            
+            // Modify prompt to explicitly instruct the model on the output language
+            let instruction = userPrompt;
+            if (selectedLanguage !== 'auto') {
+                const languageLabel = languages.find(l => l.code === selectedLanguage).label.split(' ')[0];
+                instruction = `Write the song entirely in ${languageLabel}. Original prompt: ${userPrompt}`;
+            }
+
+            // Incorporate Character into Instruction
+            if (characterLabel) {
+                // Use the descriptive label in the prompt to guide the model's writing style
+                instruction = `Persona: ${characterLabel}. ${instruction}`;
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: instruction }] }], // Use the language-specific instruction
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                }
+            };
+
+            const url = API_URL + apiKey;
+            
+            try {
+                const response = await fetchWithBackoff(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                const candidate = result.candidates?.[0];
+                const jsonText = candidate?.content?.parts?.[0]?.text;
+
+                if (!jsonText) {
+                    throw new Error("Model response was empty or malformed.");
+                }
+
+                const songData = JSON.parse(jsonText);
+                // Update the global data structure after successful generation
+                initialSongData = songData; 
+                displaySong(songData);
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                displayError(`Failed to compose the song: ${error.message}. Please try again.`);
+            } finally {
+                generateButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Initiates the TTS generation and playback.
+         */
+        async function speakLyrics() {
+            const currentSongData = initialSongData; 
+            // Get the selected voice name
+            const selectedVoice = document.getElementById('voice-select').value; 
+            
+            // Replace newlines with spaces for smoother reading flow
+            const lyricsToSpeak = currentSongData.lyrics.replace(/[\n]/g, ' '); 
+            const speakButton = document.getElementById('speak-button');
+            const speakIcon = document.getElementById('speak-icon');
+            const downloadButton = document.getElementById('download-button'); // Get download button reference
+
+            if (!lyricsToSpeak) return;
+
+            // UI state management for speech
+            speakButton.disabled = true;
+            speakIcon.innerHTML = `<svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            
+            // Disable and grey out download button until audio is ready
+            downloadButton.classList.remove('bg-[#ff5757]', 'hover:bg-[#e54242]');
+            downloadButton.classList.add('bg-gray-600', 'hover:bg-gray-700', 'opacity-50', 'cursor-not-allowed');
+
+
+            // Craft the detailed prompt for expressive reading, including the musical vision
+            // The TTS model will auto-detect the language from the lyrics text itself
+            const ttsPrompt = `Read the following lyrics with a tone suitable for a song described as: ${currentSongData.structure}. The lyrics are: ${lyricsToSpeak}`;
+
+            const ttsPayload = {
+                contents: [{ parts: [{ text: ttsPrompt }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            // Use the dynamically selected voice
+                            prebuiltVoiceConfig: { voiceName: selectedVoice } 
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+            
+            try {
+                const response = await fetchWithBackoff(TTS_API_URL + apiKey, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ttsPayload)
+                });
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    // API returns L16 (16-bit PCM). We assume 24000Hz.
+                    const sampleRate = 24000;
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const wavBlob = pcmToWav(pcmData, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    // --- ENABLE DOWNLOAD BUTTON ---
+                    lastAudioUrl = audioUrl;
+                    const audioTitle = currentSongData.title.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                    
+                    downloadButton.href = audioUrl;
+                    downloadButton.download = `Dhunkar_${audioTitle}_${selectedVoice}.wav`;
+                    // Re-enable/re-style the download button
+                    downloadButton.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-600', 'hover:bg-gray-700');
+                    downloadButton.classList.add('bg-[#ff5757]', 'hover:bg-[#e54242]');
+                    // --- END ENABLE DOWNLOAD BUTTON ---
+
+
+                    // Play the audio
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onended = () => {
+                        // Reset speak button state after playback
+                        speakButton.disabled = false;
+                        speakIcon.innerHTML = `<i data-lucide="volume-2" class="w-5 h-5 mr-2"></i>Speak Lyrics`;
+                        lucide.createIcons();
+                    };
+
+                } else {
+                    throw new Error("Invalid audio response format. Check console for details.");
+                }
+
+            } catch (error) {
+                console.error("TTS API Error:", error);
+                displayError(`Failed to generate speech: ${error.message}.`);
+            } finally {
+                // Ensure speak button is reset if an error occurs before playback starts
+                if(speakButton && speakButton.disabled) {
+                    speakButton.disabled = false;
+                    speakIcon.innerHTML = `<i data-lucide="volume-2" class="w-5 h-5 mr-2"></i>Speak Lyrics`;
+                    lucide.createIcons();
+                }
+            }
+        }
+
+        /**
+         * Renders the generated song data to the output card.
+         */
+        function displaySong(data) {
+            const { title, genre, structure, lyrics } = data;
+            
+            // Reset global audio state for a new song
+            lastAudioUrl = null; 
+
+            let html = `
+                <div class="mb-6 border-b border-gray-600 pb-4">
+                    <p class="text-sm font-medium text-gray-400">Title</p>
+                    <h3 class="text-3xl font-extrabold text-white mt-1">${title}</h3>
+                </div>
+
+                <div class="mb-6">
+                    <p class="text-sm font-medium text-gray-400">Genre</p>
+                    <p class="text-xl font-semibold text-[#ff5757]">${genre}</p>
+                </div>
+                
+                <!-- Action Buttons: Speak and Download --><div class="flex flex-col sm:flex-row gap-4 mb-6 pt-4 border-t border-gray-700">
+                    <button id="speak-button" class="btn-primary w-full sm:w-1/2 py-3 rounded-xl text-lg font-semibold flex items-center justify-center" onclick="speakLyrics()">
+                        <span id="speak-icon" class="flex items-center">
+                            <i data-lucide="volume-2" class="w-5 h-5 mr-2"></i>
+                            Speak Lyrics
+                        </span>
+                    </button>
+                    <!-- Download button (anchor tag) - initially disabled visually (gray, opaque, no hover) --><a id="download-button" class="btn-primary bg-gray-600 hover:bg-gray-700 w-full sm:w-1/2 py-3 rounded-xl text-lg font-semibold flex items-center justify-center opacity-50 cursor-not-allowed" href="#" download>
+                        <i data-lucide="download" class="w-5 h-5 mr-2"></i>
+                        Download Audio
+                    </a>
+                </div>
+                
+                <div class="mb-6 border-b border-gray-600 pb-4">
+                    <p class="text-sm font-medium text-gray-400">Musical Vision & Structure</p>
+                    <p class="text-base text-gray-300">${structure}</p>
+                </div>
+                
+                <div class="mb-0">
+                    <p class="text-sm font-medium text-gray-400 mb-3 flex items-center">
+                         <i data-lucide="mic" class="w-4 h-4 mr-2"></i>
+                        Lyrics
+                    </p>
+                    <div class="lyrics-box p-4 bg-[#1a1a2e] rounded-lg shadow-inner text-white">
+                        ${lyrics.trim()}
+                    </div>
+                </div>
+            `;
+            
+            songOutputContent.innerHTML = html;
+            lucide.createIcons(); // Re-create icons for the new content
+            outputCard.classList.remove('hidden');
+        }
+
+        /**
+         * Displays an error message.
+         */
+        function displayError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        // Initialize Lucide Icons and Selectors
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            
+            // Populate the Voice dropdown
+            const voiceSelectEl = document.getElementById('voice-select');
+            voices.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = voice.label;
+                if (voice.name === "Kore") { // Set Kore as default
+                    option.selected = true;
+                }
+                voiceSelectEl.appendChild(option);
+            });
+
+            // Populate the Language dropdown (NEW)
+            const languageSelectEl = document.getElementById('language-select');
+            languages.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang.code;
+                option.textContent = lang.label;
+                if (lang.code === "hi") { // Set Hindi as default since the previous song was in Hindi
+                    option.selected = true;
+                }
+                languageSelectEl.appendChild(option);
+            });
+
+            // Populate the Character dropdown (NEW)
+            const characterSelectEl = document.getElementById('character-select');
+            personas.forEach(persona => {
+                const option = document.createElement('option');
+                option.value = persona.code;
+                option.textContent = persona.label;
+                if (persona.code === "") { // Set default/none
+                    option.selected = true;
+                }
+                characterSelectEl.appendChild(option);
+            });
+
+
+            // Pre-fill and display initial data
+            songPromptEl.value = "Dil mein rakh lunga nishani ki tarah";
+            displaySong(initialSongData);
+        });
+
+    </script>
+</body>
+</html>
+
+
